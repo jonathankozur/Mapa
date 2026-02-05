@@ -8,12 +8,9 @@ import {
     booleanPointInPolygon,
     buffer,
     featureCollection,
-    point,
-    intersect,
     lineString,
     length,
     along,
-    multiLineString,
     distance,
     transformRotate,
     centroid,
@@ -141,24 +138,6 @@ export function generateGridPoints(
     let grid: FeatureCollection<Point>;
 
     if (gridType === 'hex') {
-        // Altura de triángulo equilátero: (sqrt(3)/2) * lado
-        // Espaciado vertical = spacing * 0.866
-        const hexSpacing = spacing;
-        // Generamos un grid denso y filtramos nosotros? 
-        // O más simple: pointGrid rectangular normal, y luego desplazamos filas impares.
-        // Pero pointGrid devuelve una colección plana.
-
-        // Mejor estrategia 'hex' real:
-        // Iterar manualmente sobre el BBOX.
-        const [minX, minY, maxX, maxY] = extent;
-        const pts: Feature<Point>[] = [];
-
-        // Convertir espaciado a grados es complejo sin referencia local.
-        // Turf pointGrid maneja esto internamente con 'distance'.
-        // Si usamos pointGrid normal, obtenemos rect.
-        // Vamos a confiar en pointGrid de turf y si gridType es hex, 
-        // usaremos `hexGrid` para obtener los *centros* de los hexágonos?
-
         // Alternativa robusta para MVP fase 2:
         // Usar hexGrid de turf y tomar el centroide de cada celda hexagonal.
         const hexPolys = hexGrid(extent, spacing, { units, mask: mask ? workingPolygon : undefined });

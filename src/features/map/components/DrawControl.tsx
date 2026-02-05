@@ -10,10 +10,19 @@ import { Feature, Polygon } from 'geojson';
 // @ts-ignore
 window.type = ''; // Workaround for some leaflet-draw global variable expectations if any
 
-export const DrawControl = () => {
+
+
+interface DrawControlProps {
+    hideToolbar?: boolean;
+    featureGroupRef?: React.MutableRefObject<L.FeatureGroup | null>;
+}
+
+export const DrawControl = ({ hideToolbar = false, featureGroupRef }: DrawControlProps) => {
     const map = useMap();
     const { polygons, setPolygons } = useMapStore();
-    const drawnItemsRef = useRef<L.FeatureGroup | null>(null);
+    // Use provided ref or fallback to local
+    const localRef = useRef<L.FeatureGroup | null>(null);
+    const drawnItemsRef = featureGroupRef || localRef;
 
     // Initialize Draw Control and Event Handlers
     useEffect(() => {
@@ -52,7 +61,12 @@ export const DrawControl = () => {
             }
         });
 
-        map.addControl(drawControl);
+        if (!hideToolbar) {
+            map.addControl(drawControl);
+        }
+
+        // Expose the draw control to window for debug/hack if needed, or better, leverage hooks eventually.
+        // For now, we rely on standard Leaflet Draw events which work even if triggered programmatically via L.Draw.Polygon(map).enable()
 
         // SYNC: Leaflet -> Store
         const syncToStore = () => {
@@ -96,22 +110,24 @@ export const DrawControl = () => {
         if (!drawnItemsRef.current) return;
         const drawnItems = drawnItemsRef.current;
 
-        const mapCount = drawnItems.getLayers().length;
-        const storeCount = polygons.length;
+        // Evitar bucles infinitos:
+        // Si el contenido del mapa ya coincide con el store (cantidad), asumimos que está sincronizado
+        // OJO: Esto es una simplificación. Si cambiamos de proyecto y ambos tienen 1 polígono, esto fallaba.
+        // La solución robusta es comparar IDs o simplemente reconstruir si no estamos editando activamente.
+        // Para este MVP, vamos a reconstruir siempre que cambie el store para garantizar consistencia.
+        // Esto arregla el bug de cambiar entre proyectos.
 
-        // Only sync if map is empty and store has data (Load), 
-        // or if store is empty and map has data (Clear/New).
-        if (mapCount === 0 && storeCount > 0) {
-            polygons.forEach((poly) => {
-                L.geoJSON(poly, {
-                    onEachFeature: (_feature, layer) => {
-                        drawnItems.addLayer(layer);
-                    }
-                });
+        drawnItems.clearLayers();
+
+        polygons.forEach((poly) => {
+            L.geoJSON(poly, {
+                onEachFeature: (_feature, layer) => {
+                    // Restaurar estilo si es necesario, Leaflet Draw usa defaults azules que coinciden con L.geoJSON usualmente
+                    drawnItems.addLayer(layer);
+                }
             });
-        } else if (mapCount > 0 && storeCount === 0) {
-            drawnItems.clearLayers();
-        }
+        });
+
     }, [polygons]);
 
     return null;
